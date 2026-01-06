@@ -20,6 +20,23 @@ my_helper = Helper.helper()
 load_dotenv()
 
 
+def parse_DeepSeek(api_key,):
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
