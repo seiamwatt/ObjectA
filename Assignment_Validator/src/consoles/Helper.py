@@ -11,7 +11,7 @@ class Helper:
                 pdf_reader = PyPDF2.PdfReader(file)
                 num_pages = len(pdf_reader.pages)
 
-                for page_num in len(num_pages):
+                for page_num in range(num_pages):
 
                     try:
                         page = pdf_reader.pages[page_num]
@@ -26,7 +26,15 @@ class Helper:
 
         except Exception as e:
             return None
-        
+    
+    def load_txt(self,file_path):
+        try:
+            with open(file_path,"r") as file:
+                content = file.read()
+                return content
+            
+        except Exception as e:
+            return None
 
 
     # List of commands for user, other instructions/documentations
