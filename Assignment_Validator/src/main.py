@@ -1,4 +1,0 @@
-# USE RICH retro terminal
-
-
-

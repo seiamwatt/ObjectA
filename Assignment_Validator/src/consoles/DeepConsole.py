@@ -1,27 +1,10 @@
-# Deep API - takes prompt and gives output to main business logic
-import os
-import csv
-import json
-import argparse
-import pandas as pd
 import requests
-import re
-import time
-from tqdm import tqdm
-from dotenv import load_dotenv
-import PyPDF2
-from pathlib import Path
 
 
-# imported modules 
-import Helper
-my_helper = Helper.helper()
-
-load_dotenv()
-
-
-def parse_DeepSeek(api_key,prompt,other_notes,model = "deepseek-chat"):
-
+def DeepSeek_Connect(api_key, prompt, model="deepseek-chat"):
+    """
+    Sends a prompt to DeepSeek API and returns the response.
+    """
     try:
         api_url = "https://api.deepseek.com/v1/chat/completions"
 
@@ -39,35 +22,26 @@ def parse_DeepSeek(api_key,prompt,other_notes,model = "deepseek-chat"):
             "temperature": 0
         }
 
-        response = requests.post(api_url,headers=headers,json=payload)
+        response = requests.post(api_url, headers=headers, json=payload)
         response.raise_for_status()
 
-        result = response.json()
+        return response.json()
 
-        return result
-    
+    except requests.exceptions.HTTPError as e:
+        print(f"DeepSeek API HTTP error: {e}")
+        return None
+    except requests.exceptions.ConnectionError:
+        print("DeepSeek API connection error - check your internet")
+        return None
     except Exception as e:
-
-        print("error connecting DeepSeek")
+        print(f"DeepSeek API error: {e}")
         return None
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+def extract_response(result):
+    """
+    Extracts the text content from DeepSeek's API response.
+    """
+    if result and "choices" in result:
+        return result["choices"][0]["message"]["content"]
+    return None

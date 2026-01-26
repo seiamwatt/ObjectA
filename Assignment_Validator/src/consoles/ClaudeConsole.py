@@ -1,34 +1,26 @@
 # Claude API - takes prompt and gives output to main business logic
-import os
-import csv
-import json
-import argparse
-import pandas as pd
-import requests
-import re
-from tqdm import tqdm
-from dotenv import load_dotenv
-import anthropic
 import requests
 
-# import helper function
-from Helper import Helper
 
-helper = Helper()
-
-
-# REST API
-
-
-def Claude_Connect(api_key,prompt,other_notes,model = 'claude-sonnet-4-5-20250929'):
-
+def Claude_Connect(api_key, prompt, model="claude-sonnet-4-5-20250929"):
+    """
+    Sends a prompt to Claude API and returns the response.
+    
+    Args:
+        api_key: Anthropic API key
+        prompt: The text prompt to send
+        model: Model to use (default: claude-sonnet-4-5-20250929)
+    
+    Returns:
+        dict: Full API response JSON, or None if error
+    """
     try:
         api_url = "https://api.anthropic.com/v1/messages"
 
         headers = {
             "Content-Type": "application/json",
-            "x-api-key": api_key,                # not "Authorization: Bearer"
-            "anthropic-version": "2023-06-01"    # required
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01"
         }
 
         payload = {
@@ -40,19 +32,32 @@ def Claude_Connect(api_key,prompt,other_notes,model = 'claude-sonnet-4-5-2025092
             "temperature": 0
         }
 
-        response = requests.post(api_url,headers = headers,json = payload)
+        response = requests.post(api_url, headers=headers, json=payload)
         response.raise_for_status()
 
-        result = response.json()
-        return result
- 
-    except Exception as e:
-        print("Error calling Claude API")
+        return response.json()
+
+    except requests.exceptions.HTTPError as e:
+        print(f"Claude API HTTP error: {e}")
         return None
+    except requests.exceptions.ConnectionError:
+        print("Claude API connection error - check your internet")
+        return None
+    except Exception as e:
+        print(f"Claude API error: {e}")
+        return None
+
+
+def extract_response(result):
+    """
+    Extracts the text content from Claude's API response.
     
+    Args:
+        result: The JSON response from Claude_Connect()
     
-
-
-
-
-
+    Returns:
+        str: The text response, or None if error
+    """
+    if result and "content" in result:
+        return result["content"][0]["text"]
+    return None
