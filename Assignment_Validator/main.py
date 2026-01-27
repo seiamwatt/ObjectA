@@ -11,8 +11,6 @@ from consoles import ClaudeConsole
 from consoles import DeepConsole
 from consoles import Helper
 
-import sys
-
 # Find .env in multiple locations
 if getattr(sys, 'frozen', False):
     bundle_dir = os.path.dirname(sys.executable)
@@ -29,26 +27,16 @@ helper = Helper.Helper()
 console = Console()
 
 
-# ============ FILE INPUT ============
+
 def get_input_file():
     """Gets file from drag-onto-exe OR prompts user."""
-    
-    if len(sys.argv) > 1:
-        file_path = sys.argv[1].strip().strip('"').strip("'")
-        # Remove escape characters from drag-and-drop
-        file_path = file_path.replace("\\", "")
-        
-        if os.path.exists(file_path):
-            return file_path
-        else:
-            console.print(f"[red]✗ File not found: {file_path}[/red]")
     
     console.print("\n[cyan]Enter file path (or drag file here):[/cyan]")
     file_path = input("> ").strip().strip('"').strip("'")
     
     # Remove escape characters from drag-and-drop
-    file_path = file_path.replace("\\ ", " ")  # Handle escaped spaces
-    file_path = file_path.replace("\\(", "(")  # Handle escaped parentheses
+    file_path = file_path.replace("\\ ", " ")
+    file_path = file_path.replace("\\(", "(")
     file_path = file_path.replace("\\)", ")")
     
     if os.path.exists(file_path):
@@ -59,11 +47,9 @@ def get_input_file():
 
 
 def get_output_path(input_path):
-    """Generates output path based on input file."""
     directory = os.path.dirname(input_path)
     filename = os.path.splitext(os.path.basename(input_path))[0]
     
-    # If no directory, use current directory
     if not directory:
         directory = "."
     
@@ -175,18 +161,25 @@ def validate_answers(question_text, max_retries=3):
     for attempt in range(1, max_retries + 1):
         console.print(f"\n[yellow]Attempt {attempt}/{max_retries}[/yellow]")
         
-        # Get answers from both LLMs
         question_prompt = build_question_prompt(question_text)
         
         with console.status("[bold blue]  Processing with Claude...[/bold blue]", spinner="dots"):
             claude_result = ClaudeConsole.Claude_Connect(CLAUDE_API_KEY, prompt=question_prompt)
             claude_answer = extract_claude_response(claude_result)
-        console.print("[green]✓[/green] Claude response received")
+        
+        if claude_answer:
+            console.print("[green]✓[/green] Claude response received")
+        else:
+            console.print("[red]✗[/red] Claude response failed")
         
         with console.status("[bold blue]  Processing with DeepSeek...[/bold blue]", spinner="dots"):
             deep_result = DeepConsole.DeepSeek_Connect(DEEP_API_KEY, prompt=question_prompt)
             deep_answer = extract_deepseek_response(deep_result)
-        console.print("[green]✓[/green] DeepSeek response received")
+        
+        if deep_answer:
+            console.print("[green]✓[/green] DeepSeek response received")
+        else:
+            console.print("[red]✗[/red] DeepSeek response failed")
         
         # Check if we got valid responses
         if not claude_answer or not deep_answer:
@@ -241,61 +234,83 @@ def save_answer_key(output_path, results, question_text):
         f.write("-" * 50 + "\n")
         f.write("Claude's Answers:\n")
         f.write("-" * 50 + "\n")
-        f.write(results["claude_answer"] + "\n\n")
+        f.write((results["claude_answer"] or "No response received") + "\n\n")
         f.write("-" * 50 + "\n")
         f.write("DeepSeek's Answers:\n")
         f.write("-" * 50 + "\n")
-        f.write(results["deep_answer"] + "\n")
+        f.write((results["deep_answer"] or "No response received") + "\n")
 
 
 # ============ MAIN ============
 
 def main():
-    display_header()
-    display_pricing_table()
+    try:
+        display_header()
+        display_pricing_table()
+        
+        # Check API keys
+        if not CLAUDE_API_KEY or not DEEP_API_KEY:
+            console.print("[red]✗ API keys not found in .env file[/red]")
+            input("\nPress Enter to exit...")
+            return
+        
+        # ========== MAIN LOOP ==========
+        while True:
+            # Get input file
+            input_path = get_input_file()
+            if not input_path:
+                if not Confirm.ask("\nTry another file?", default=True):
+                    break
+                continue
+            
+            console.print(f"[green]✓[/green] Selected: {input_path}")
+            
+            # Auto-generate output path
+            output_path = get_output_path(input_path)
+            console.print(f"[dim]Output will be saved to: {output_path}[/dim]")
+            
+            # Confirm before proceeding
+            if not Confirm.ask("\nProceed with validation?", default=True):
+                if not Confirm.ask("Try a different file?", default=True):
+                    break
+                continue
+            
+            # Load file
+            console.print("\n[bold yellow]Initiating validation sequence...[/bold yellow]")
+            
+            with console.status("[bold blue]  Loading file...[/bold blue]", spinner="dots"):
+                question_text = load_file(input_path)
+            
+            if not question_text:
+                console.print("[red]✗ Error: Could not load file[/red]")
+                if not Confirm.ask("\nTry another file?", default=True):
+                    break
+                continue
+            
+            console.print("[green]✓[/green] File loaded successfully")
+            
+            # Run validation
+            results = validate_answers(question_text, max_retries=3)
+            
+            # Save output
+            with console.status("[bold blue]  Saving answer key...[/bold blue]", spinner="dots"):
+                save_answer_key(output_path, results, question_text)
+            
+            console.print(f"[green]✓[/green] Answer key saved to: {output_path}")
+            console.print("\n[bold green]Done![/bold green]")
+            
+            # Ask to continue or quit
+            console.print("\n" + "=" * 50)
+            if not Confirm.ask("\nValidate another file?", default=True):
+                break
+        
+        console.print("\n[cyan]Goodbye![/cyan]")
+        
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Cancelled by user[/yellow]")
+    except Exception as e:
+        console.print(f"\n[red]Error: {e}[/red]")
     
-    # Get input file (drag-drop or prompt)
-    input_path = get_input_file()
-    if not input_path:
-        input("\nPress Enter to exit...")
-        return
-    
-    console.print(f"[green]✓[/green] Selected: {input_path}")
-    
-    # Auto-generate output path
-    output_path = get_output_path(input_path)
-    console.print(f"[dim]Output will be saved to: {output_path}[/dim]")
-    
-    # Confirm before proceeding
-    if not Confirm.ask("\nProceed with validation?", default=True):
-        console.print("[yellow]Cancelled.[/yellow]")
-        input("\nPress Enter to exit...")
-        return
-    
-    # Load file
-    console.print("\n[bold yellow]Initiating validation sequence...[/bold yellow]")
-    
-    with console.status("[bold blue]  Loading file...[/bold blue]", spinner="dots"):
-        question_text = load_file(input_path)
-    
-    if not question_text:
-        console.print("[red]✗ Error: Could not load file[/red]")
-        input("\nPress Enter to exit...")
-        return
-    
-    console.print("[green]✓[/green] File loaded successfully")
-    
-    # Run validation
-    results = validate_answers(question_text, max_retries=3)
-    
-    # Save output
-    with console.status("[bold blue]  Saving answer key...[/bold blue]", spinner="dots"):
-        save_answer_key(output_path, results, question_text)
-    
-    console.print(f"[green]✓[/green] Answer key saved to: {output_path}")
-    
-    # Keep window open
-    console.print("\n[bold green]Done![/bold green]")
     input("\nPress Enter to exit...")
 
 
