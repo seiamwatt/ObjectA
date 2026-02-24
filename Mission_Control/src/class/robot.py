@@ -26,6 +26,12 @@ class Robot:
     def edit_operational_status(self,new_status):
         self.operational_status = new_status
 
+    def edit_uptime(self,new_uptime):
+        self.uptime = new_uptime
+
+    def edit_downtime(self,new_downtime):
+        self.downtime = new_downtime
+
     def generate_id(self):
         self.id = uuid.uuid4()
         self.id_status = True
